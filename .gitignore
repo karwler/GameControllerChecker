@@ -1,0 +1,26 @@
+#directories
+bin
+build*
+CMakeFiles
+
+#hidden files and directories
+.*
+
+#files
+*.o
+*.obj
+*.out
+*.res
+*.ilk
+*.idb
+*.pdb
+*.log
+*.autosave
+*.user
+*.sdf
+*.sln
+*.vcxproj
+*.filters
+*.cmake
+*.opendb
+Makefile
