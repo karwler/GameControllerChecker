@@ -55,9 +55,6 @@ SOURCES += src/engine/engine.cpp \
     src/engine/scene.cpp \
     src/engine/windowSys.cpp \
     src/engine/world.cpp \
-    src/prog/browser.cpp \
-    src/prog/library.cpp \
-    src/prog/playlistEditor.cpp \
     src/prog/program.cpp \
     src/utils/objects.cpp \
     src/utils/scrollArea.cpp \
@@ -67,7 +64,6 @@ SOURCES += src/engine/engine.cpp \
 HEADERS += src/engine/engine.h \
     src/engine/inputSys.h \
     src/engine/scene.h \
-    src/engine/shaderSys.h \
     src/engine/windowSys.h \
     src/engine/world.h \
     src/kklib/aliases.h \
