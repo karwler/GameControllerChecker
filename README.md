@@ -1,4 +1,4 @@
-# GamepadChecker
+# GameControllerChecker
 A small GUI application for displaying the indexes and values of pushed buttons or axes on a game controller.  
 You can switch between DirectInput, XInput and haptic testing if supported by the controller.  
 
