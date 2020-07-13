@@ -2,6 +2,7 @@
 bin
 build*
 CMakeFiles
+lib*
 
 #hidden files and directories
 .*

@@ -1,123 +1,173 @@
-cmake_minimum_required(VERSION 3.1.0)
-cmake_policy(SET CMP0015 NEW)
-cmake_policy(SET CMP0043 NEW)
-
+cmake_minimum_required(VERSION 3.10.2)
 project(GameControllerChecker LANGUAGES CXX)
-set(CMAKE_CONFIGURATION_TYPES "Debug" "Release")
+if(CMAKE_CONFIGURATION_TYPES)
+	set(CMAKE_CONFIGURATION_TYPES "Debug" "Release")
+endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # source files
 set(SRC_FILES
-	"src/engine/engine.cpp"
-	"src/engine/engine.h"
-	"src/engine/inputSys.cpp"
-	"src/engine/inputSys.h"
-	"src/engine/main.cpp"
-	"src/engine/scene.cpp"
-	"src/engine/scene.h"
-	"src/engine/windowSys.cpp"
-	"src/engine/windowSys.h"
-	"src/engine/world.cpp"
-	"src/engine/world.h"
-	"src/kklib/aliases.h"
-	"src/kklib/sptr.h"
-	"src/kklib/vec2.h"
-	"src/kklib/vec3.h"
-	"src/kklib/vec4.h"
-	"src/prog/defaults.h"
-	"src/prog/program.cpp"
-	"src/prog/program.h"
-	"src/utils/objects.cpp"
-	"src/utils/objects.h"
-	"src/utils/scrollArea.cpp"
-	"src/utils/scrollArea.h"
-	"src/utils/types.cpp"
-	"src/utils/types.h"
-	"src/utils/utils.cpp"
-	"src/utils/utils.h")
+	"src/inputSys.cpp"
+	"src/inputSys.h"
+	"src/objects.cpp"
+	"src/objects.h"
+	"src/program.cpp"
+	"src/program.h"
+	"src/utils.h"
+	"src/windowSys.cpp"
+	"src/windowSys.h"
+	"src/world.cpp"
+	"src/world.h")
 
-# include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+# dependencies
+set(VER_SDL "2.0.12" CACHE STRING "SDL2 version.")
+set(VER_TTF "2.0.15" CACHE STRING "SDL2_ttf version.")
+set(DIR_LIB "${CMAKE_SOURCE_DIR}/lib")
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+function(downloadLib URL DST LIBDIR)
+	get_filename_component(LIBDIR "${LIBDIR}" NAME)
+	if(EXISTS "${DST}/${LIBDIR}")
+		message(STATUS "Found ${DST}/${LIBDIR}")
+		return()
+	endif()
+
+	get_filename_component(FILE "${URL}" NAME)
+	if(EXISTS "${DST}/${FILE}")
+		message(STATUS "Found ${DST}/${FILE}")
+	else()
+		message(STATUS "Downloading ${URL}")
+		file(DOWNLOAD "${URL}" "${DST}/${FILE}")
+	endif()
+
+	if(FILE MATCHES ".zip$")
+		execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xf "${FILE}" WORKING_DIRECTORY "${DST}")
+	elseif(FILE MATCHES ".tar.gz$")
+		execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xzf "${FILE}" WORKING_DIRECTORY "${DST}")
+	elseif(FILE MATCHES ".dmg$")
+		execute_process(COMMAND hdiutil attach "${DST}/${FILE}")
+		string(FIND "${FILE}" "-" FID)
+		string(SUBSTRING "${FILE}" 0 ${FID} FNAME)
+		file(COPY "/Volumes/${FNAME}/${FNAME}.framework" DESTINATION "${DST}")
+	endif()
+endfunction()
+
+include_directories("${CMAKE_SOURCE_DIR}/src")
+if(NOT EMSCRIPTEN)
+	file(MAKE_DIRECTORY "${DIR_LIB}")
+	if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+		if(MSVC)
+			set(DIR_SDL "${DIR_LIB}/SDL2-${VER_SDL}")
+			set(DIR_TTF "${DIR_LIB}/SDL2_ttf-${VER_TTF}")
+			if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+				set(BIN_SDL "${DIR_SDL}/lib/x64")
+				set(BIN_TTF "${DIR_TTF}/lib/x64")
+			else()
+				set(BIN_SDL "${DIR_SDL}/lib/x86")
+				set(BIN_TTF "${DIR_TTF}/lib/x86")
+			endif()
+			set(LIB_SDL "${BIN_SDL}")
+			set(LIB_TTF "${BIN_TTF}")
+			set(INC_SDL "${DIR_SDL}/include")
+			set(INC_TTF "${DIR_TTF}/include")
+			set(URL_SDL "https://www.libsdl.org/release/SDL2-devel-${VER_SDL}-VC.zip")
+			set(URL_TTF "https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-devel-${VER_TTF}-VC.zip")
+		else()
+			if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+				set(DIR_SDL "${DIR_LIB}/SDL2-${VER_SDL}/x86_64-w64-mingw32")
+				set(DIR_TTF "${DIR_LIB}/SDL2_ttf-${VER_TTF}/x86_64-w64-mingw32")
+			else()
+				set(DIR_SDL "${DIR_LIB}/SDL2-${VER_SDL}/i686-w64-mingw32")
+				set(DIR_TTF "${DIR_LIB}/SDL2_ttf-${VER_TTF}/i686-w64-mingw32")
+			endif()
+			set(DIR_GLEW "${DIR_LIB}/glew-${VER_GLEW}")
+			set(BIN_SDL "${DIR_SDL}/bin")
+			set(BIN_TTF "${DIR_TTF}/bin")
+			set(LIB_SDL "${DIR_SDL}/lib")
+			set(LIB_TTF "${DIR_TTF}/lib")
+			set(INC_SDL "${DIR_SDL}/include/SDL2")
+			set(INC_TTF "${DIR_TTF}/include/SDL2")
+			set(URL_SDL "https://www.libsdl.org/release/SDL2-devel-${VER_SDL}-mingw.tar.gz")
+			set(URL_TTF "https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-devel-${VER_TTF}-mingw.tar.gz")
+		endif()
+		downloadLib("${URL_SDL}" "${DIR_LIB}" "${DIR_SDL}")
+		downloadLib("${URL_TTF}" "${DIR_LIB}" "${DIR_TTF}")
+		link_directories("${LIB_SDL}" "${LIB_TTF}")
+		include_directories("${INC_SDL}" "${INC_TTF}")
+	endif()
 endif()
 
-# library/framework directories
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    if (${CMAKE_SIZEOF_VOID_P} MATCHES "8")
-		set(LIB_DIR ${CMAKE_SOURCE_DIR}/lib/win64)
-		set(DLL_FILES
-			"libfreetype-6.dll"
-			"SDL2.dll"
-			"SDL2_ttf.dll"
-			"zlib1.dll")
-    else()
-        set(LIB_DIR ${CMAKE_SOURCE_DIR}/lib/win32)
-		set(DLL_FILES
-			"libfreetype-6.dll"
-			"SDL2.dll"
-			"SDL2_ttf.dll"
-			"zlib1.dll")
-    endif()	
-	link_directories(${LIB_DIR})
-endif()
-
-# definitions
+# flags
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	add_definitions(-D_UNICODE -D_CRT_SECURE_NO_WARNINGS)
 endif()
-	
-# set main target
-add_executable(GameControllerChecker ${SRC_FILES})
-target_compile_features(GameControllerChecker PUBLIC cxx_nullptr cxx_enum_forward_declarations cxx_variadic_templates cxx_alias_templates cxx_raw_string_literals cxx_unicode_literals cxx_long_long_type cxx_rvalue_references)
 
-# linker flags
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-	target_link_libraries(GameControllerChecker SDL2.lib SDL2_ttf.lib)
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-	target_link_libraries(GameControllerChecker SDL2 SDL2_ttf)
+if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+	set(CXX_FLG_ANY "-Wall -Wextra -pedantic-errors -Wdouble-promotion -Wformat=2 -Wmissing-declarations -Wold-style-cast -Wshadow -Wunreachable-code -Wno-implicit-fallthrough -Wno-parentheses -Wno-switch")
+	if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		set(CXX_FLG_ANY "${CXX_FLG_ANY} -Wcast-align=strict -Wduplicated-branches -Wduplicated-cond -Wlogical-op -Wuseless-cast")
+	else()
+		set(CXX_FLG_ANY "${CXX_FLG_ANY} -Wcast-align -Wnull-dereference -Wshadow-all -Wno-unused-private-field")
+	endif()
+
+	if(EMSCRIPTEN)
+		set(CXX_FLG_ANY "${CXX_FLG_ANY} --preload-file ${CMAKE_BINARY_DIR}/data@/ -s TOTAL_MEMORY=536870912 -s WASM=1 -s USE_SDL=2 -s USE_SDL_TTF=2 -lidbfs.js -Wno-gnu-zero-variadic-macro-arguments -Wno-unused-parameter")
+		set(FLG_DEBUG "-g4 -s DISABLE_EXCEPTION_CATCHING=0")
+		set(FLG_RELEASE "-O3")
+	else()
+		set(FLG_DEBUG "-g")
+		set(FLG_RELEASE "-O3")
+		if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			set(FLG_RELEASE "${FLG_RELEASE} -s")
+		endif()
+	endif()
+elseif(MSVC)
+	set(CXX_FLG_ANY "/W4 /wd4100 /wd4201 /wd4244 /wd4458 /wd4706 /wd4805")
+	set(FLG_DEBUG "/Od /Ob0")
+	set(FLG_RELEASE "/O2 /Ob2 /Oi /Ot /GL")
 endif()
 
-# target path
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
+if(CMAKE_CONFIGURATION_TYPES)
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CXX_FLG_ANY} ${FLG_DEBUG}")
+	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${CXX_FLG_ANY} ${FLG_RELEASE}")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_FLG_ANY} ${FLG_DEBUG}")
+else()
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_FLG_ANY} ${FLG_RELEASE}")
+endif()
 
-# target properties
-set_target_properties(GameControllerChecker PROPERTIES
-									OUTPUT_NAME GameControllerChecker
+# main target
+add_executable(${PROJECT_NAME} WIN32 ${SRC_FILES})
+if(EMSCRIPTEN)
+	return()
+endif()
+target_link_libraries(${PROJECT_NAME} SDL2 SDL2_ttf)
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
+set_target_properties(${PROJECT_NAME} PROPERTIES
 									RUNTIME_OUTPUT_DIRECTORY "${EXECUTABLE_OUTPUT_PATH}"
 									RUNTIME_OUTPUT_DIRECTORY_DEBUG "${EXECUTABLE_OUTPUT_PATH}"
 									RUNTIME_OUTPUT_DIRECTORY_RELEASE "${EXECUTABLE_OUTPUT_PATH}")
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-	set_target_properties(GameControllerChecker PROPERTIES
-									LINK_FLAGS_DEBUG "/SUBSYSTEM:CONSOLE"
-									LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
+# post buils commands
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+						COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${BIN_SDL}/SDL2.dll" "${BIN_TTF}/SDL2_ttf.dll" "${BIN_TTF}/libfreetype-6.dll" "${BIN_TTF}/zlib1.dll" "${EXECUTABLE_OUTPUT_PATH}"
+						COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${DIR_SDL}/COPYING.txt" "${EXECUTABLE_OUTPUT_PATH}/COPYING.SDL.txt"
+						COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${BIN_TTF}/LICENSE.freetype.txt" "${EXECUTABLE_OUTPUT_PATH}"
+						COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${BIN_TTF}/LICENSE.zlib.txt" "${EXECUTABLE_OUTPUT_PATH}")
 endif()
 
-# uncomment the following line for 32 bit build (unless the compiler doesn't use the "-m32" option)
-# set_target_properties(GameControllerChecker PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
-
-# post buils commands
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-	foreach(dll_file ${DLL_FILES})
-		add_custom_command(TARGET GameControllerChecker POST_BUILD
-						COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LIB_DIR}/${dll_file} ${EXECUTABLE_OUTPUT_PATH})
-	endforeach()
+if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") AND (NOT CMAKE_BUILD_TYPE STREQUAL "Debug"))
+	find_program(STRIPPER "strip")
+	if(STRIPPER)
+		add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD COMMAND "${STRIPPER}" -s "${EXECUTABLE_OUTPUT_PATH}/${PROJECT_NAME}")
+	endif()
 endif()
 
 # filter file for ms visual studio
-foreach(source IN LISTS SRC_FILES)
-	get_filename_component(source_dir ${source} PATH)
-	string(REPLACE "/" ";" dirs "${source_dir}")
-	list(GET dirs 0 dir0)
-	
-	if (${dir0} MATCHES "rsc")
-		set(filter_path "Source")
-	else()
-		list(REMOVE_AT dirs 0)
-		list(INSERT dirs 0 "Source")
-		string(REPLACE ";" "\\" filter_path "${dirs}")
-	endif()
-	source_group("${filter_path}" FILES ${source})
+foreach(FSRC IN LISTS SRC_FILES)
+	get_filename_component(FGRP "${FSRC}" DIRECTORY)
+	source_group("${FGRP}" FILES "${FSRC}")
 endforeach()
-
