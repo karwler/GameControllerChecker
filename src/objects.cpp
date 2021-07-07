@@ -1,10 +1,13 @@
-#include "world.h"
+#include "objects.h"
+#include "inputSys.h"
+#include "windowSys.h"
 
 // OBJECT
 
-Object::Object(SDL_Point ANC, SDL_Point POS, SDL_Point SIZ, EFix FIX, SDL_Color CLR) :
+Object::Object(WindowSys* WIN, SDL_Point ANC, SDL_Point POS, SDL_Point SIZ, EFix FIX, SDL_Color CLR) :
 	color(CLR),
-	fix(FIX)
+	fix(FIX),
+	win(WIN)
 {
 	if (POS.x == -1)
 		POS.x = ANC.x;
@@ -16,7 +19,7 @@ Object::Object(SDL_Point ANC, SDL_Point POS, SDL_Point SIZ, EFix FIX, SDL_Color 
 }
 
 void Object::Draw() {
-	World::Window()->DrawRect(Rect(), color);
+	win->DrawRect(Rect(), color);
 }
 
 SDL_Rect Object::Rect() const {
@@ -25,40 +28,40 @@ SDL_Rect Object::Rect() const {
 }
 
 SDL_Point Object::Anchor() const {
-	SDL_Point ret, res = World::Window()->Resolution();
+	SDL_Point ret, res = win->Resolution();
 	ret.x = int(fix & FIX_X ? anchorX : anchorX * float(res.x));
 	ret.y = int(fix & FIX_Y ? anchorY : anchorY * float(res.y));
 	return ret;
 }
 
 void Object::Anchor(SDL_Point newPos) {
-	SDL_Point res = World::Window()->Resolution();
+	SDL_Point res = win->Resolution();
 	anchorX = fix & FIX_X ? float(newPos.x) : float(newPos.x) / float(res.x);
 	anchorY = fix & FIX_Y ? float(newPos.y) : float(newPos.y) / float(res.y);
 }
 
 SDL_Point Object::Pos() const {
-	SDL_Point ret = Anchor(), res = World::Window()->Resolution();
+	SDL_Point ret = Anchor(), res = win->Resolution();
 	ret.x = fix & FIX_PX ? int(posX * float(res.x)) : fix & FIX_W ? ret.x + int(posX) : ret.x + int(posX * float(res.x));
 	ret.y = fix & FIX_PY ? int(posY * float(res.y)) : fix & FIX_H ? ret.y + int(posY) : ret.y + int(posY * float(res.y));
 	return ret;
 }
 
 void Object::Pos(SDL_Point newPos) {
-	SDL_Point dist = newPos - Anchor(), res = World::Window()->Resolution();
+	SDL_Point dist = newPos - Anchor(), res = win->Resolution();
 	posX = fix & FIX_PX ? float(newPos.x) / float(res.x) : fix & FIX_W ? float(dist.x) : float(dist.x) / float(res.x);
 	posY = fix & FIX_PY ? float(newPos.y) / float(res.y) : fix & FIX_H ? float(dist.y) : float(dist.y) / float(res.y);
 }
 
 SDL_Point Object::End() const {
-	SDL_Point ret = Anchor(), res = World::Window()->Resolution();
+	SDL_Point ret = Anchor(), res = win->Resolution();
 	ret.x = fix & FIX_EX ? int(endX * float(res.x)) : fix & FIX_W ? ret.x + int(endX) : ret.x + int(endX * float(res.x));
 	ret.y = fix & FIX_EY ? int(endY * float(res.y)) : fix & FIX_H ? ret.y + int(endY) : ret.y + int(endY * float(res.y));
 	return ret;
 }
 
 void Object::End(SDL_Point newPos) {
-	SDL_Point dist = newPos - Anchor(), res = World::Window()->Resolution();;
+	SDL_Point dist = newPos - Anchor(), res = win->Resolution();;
 	endX = fix & FIX_EX ? float(newPos.x) / float(res.x) : fix & FIX_W ? float(dist.x) : float(dist.x) / float(res.x);
 	endY = fix & FIX_EY ? float(newPos.y) / float(res.y) : fix & FIX_H ? float(dist.y) : float(dist.y) / float(res.y);
 }
@@ -68,27 +71,27 @@ SDL_Point Object::Size() const {
 }
 
 void Object::Size(SDL_Point newSize) {
-	SDL_Point dist = Pos() + newSize - Anchor(), res = World::Window()->Resolution();;;
+	SDL_Point dist = Pos() + newSize - Anchor(), res = win->Resolution();;;
 	endX = fix & FIX_EX ? float(Pos().x + newSize.x) / float(res.x) : fix & FIX_W ? float(dist.x) : float(dist.x) / float(res.x);
 	endY = fix & FIX_EY ? float(Pos().y + newSize.y) / float(res.y) : fix & FIX_H ? float(dist.y) : float(dist.y) / float(res.y);
 }
 
 SDL_Color Object::GetColor(SDL_Color clr, bool light) {
 	return !light ? clr : SDL_Color{
-		uint8(std::clamp(float(clr.r) * highlight, 0.f, 255.f)),
-		uint8(std::clamp(float(clr.g) * highlight, 0.f, 255.f)),
-		uint8(std::clamp(float(clr.b) * highlight, 0.f, 255.f)),
+		uint8_t(std::clamp(float(clr.r) * highlight, 0.f, 255.f)),
+		uint8_t(std::clamp(float(clr.g) * highlight, 0.f, 255.f)),
+		uint8_t(std::clamp(float(clr.b) * highlight, 0.f, 255.f)),
 		clr.a
 	};
 }
 
 // LABEL
 
-Label::Label(const Object& BASE, string&& TXT, Align ALG) :
-	Object(BASE),
+Label::Label(Object&& BASE, string&& TXT, Align ALG) :
+	Object(std::move(BASE)),
 	align(ALG),
 	text(std::move(TXT)),
-	tex(World::Window()->RenderText(text, Size().y))
+	tex(win->RenderText(text, Size().y))
 {}
 
 Label::~Label() {
@@ -111,14 +114,14 @@ void Label::Draw() {
 		SDL_QueryTexture(tex, nullptr, nullptr, &w, nullptr);
 		ofs = bg.w - w - offset;
 	}
-	World::Window()->DrawRect(bg, GetColor(color, World::Input()->IsSelected(this)));
-	World::Window()->DrawText(tex, {bg.x + ofs, bg.y}, bg);
+	win->DrawRect(bg, GetColor(color, win->Input()->IsSelected(this)));
+	win->DrawText(tex, {bg.x + ofs, bg.y}, bg);
 }
 
 void Label::OnResize() {
 	if (tex)
 		SDL_DestroyTexture(tex);
-	tex = World::Window()->RenderText(text, Size().y);
+	tex = win->RenderText(text, Size().y);
 }
 
 const string& Label::Text() const {
@@ -136,22 +139,21 @@ SDL_Texture* Label::Texture() const {
 
 // BUTTON
 
-Button::Button(const Object& BASE, void (Program::*CALLB)(), string&& TXT, Align ALG) :
-	Label(BASE, std::move(TXT), ALG),
+Button::Button(Object&& BASE, void (Program::*CALLB)(), string&& TXT, Align ALG) :
+	Label(std::move(BASE), std::move(TXT), ALG),
 	callback(CALLB)
 {}
 
 void Button::OnClick() {
 	if (callback)
-		(World::Prog()->*callback)();
+		(win->Input()->Prog()->*callback)();
 }
 
 // LINE EDITOR
 
-LineEditor::LineEditor(const Object& BASE, string&& TXT, Type TYPE, void (Program::*KCALL)(const string&), void (Program::*CCALL)()) :
-	Button(BASE, CCALL, std::move(TXT)),
+LineEditor::LineEditor(Object&& BASE, string&& TXT, Type TYPE, void (Program::*KCALL)(const string&), void (Program::*CCALL)()) :
+	Button(std::move(BASE), CCALL, std::move(TXT)),
 	okCall(KCALL),
-	textPos(0),
 	type(TYPE)
 {
 	CheckText();
@@ -159,14 +161,14 @@ LineEditor::LineEditor(const Object& BASE, string&& TXT, Type TYPE, void (Progra
 
 void LineEditor::Draw() {
 	SDL_Rect bg = Rect();
-	World::Window()->DrawRect(bg, GetColor(color, World::Input()->IsSelected(this)));
-	World::Window()->DrawText(tex, {bg.x - textPos, bg.y}, bg);
-	if (World::Input()->Captured() == this)
-		World::Window()->DrawRect(Caret(), Object::colorLight);
+	win->DrawRect(bg, GetColor(color, win->Input()->IsSelected(this)));
+	win->DrawText(tex, {bg.x - textPos, bg.y}, bg);
+	if (win->Input()->Captured() == this)
+		win->DrawRect(Caret(), Object::colorLight);
 }
 
 void LineEditor::OnClick() {
-	World::Input()->SetCapture(this);
+	win->Input()->SetCapture(this);
 	cpos = text.length();
 }
 
@@ -204,27 +206,27 @@ void LineEditor::OnText(const char* str) {
 
 void LineEditor::Confirm() {
 	if (textPos = 0; okCall)
-		(World::Prog()->*okCall)(text);
-	World::Input()->SetCapture(nullptr);
+		(win->Input()->Prog()->*okCall)(text);
+	win->Input()->SetCapture(nullptr);
 }
 
 void LineEditor::Cancel() {
 	if (textPos = 0; callback)
-		(World::Prog()->*callback)();
-	World::Input()->SetCapture(nullptr);
+		(win->Input()->Prog()->*callback)();
+	win->Input()->SetCapture(nullptr);
 }
 
 SDL_Rect LineEditor::Caret() const {
 	SDL_Point pos = Pos();
 	int height = Size().y;
-	return {World::Window()->Fonts()->TextSize(text.substr(0, cpos), height).x - textPos + pos.x, pos.y, 5, height};
+	return {win->Fonts()->TextSize(text.substr(0, cpos), height).x - textPos + pos.x, pos.y, 5, height};
 }
 
 void LineEditor::MoveCursor(bool right) {
 	if (right && cpos != text.length())
-		cpos++;
+		++cpos;
 	else if (!right && cpos)
-		cpos--;
+		--cpos;
 }
 
 void LineEditor::Delete(bool current) {
@@ -234,7 +236,7 @@ void LineEditor::Delete(bool current) {
 			OnResize();
 		}
 	} else if (cpos) {
-		cpos--;
+		--cpos;
 		text.erase(cpos, 1);
 		OnResize();
 	}
@@ -261,21 +263,20 @@ void LineEditor::CheckText() {
 
 // HOR SLIDER
 
-HorSlider::HorSlider(const Object& BASE, float VAL, void (Program::*CAL)(float)) :
-	Object(BASE),
-	diffSliderMouseX(0),
+HorSlider::HorSlider(Object&& BASE, float VAL, void (Program::*CAL)(float)) :
+	Object(std::move(BASE)),
 	value(VAL),
 	callb(CAL)
 {}
 
 void HorSlider::Draw() {
-	World::Window()->DrawRect(Rect(), GetColor(Object::colorDark, World::Input()->IsSelected(this)));
-	World::Window()->DrawRect(Slider(), Object::colorLight);
+	win->DrawRect(Rect(), GetColor(Object::colorDark, win->Input()->IsSelected(this)));
+	win->DrawRect(Slider(), Object::colorLight);
 }
 
 void HorSlider::DragSlider(int xpos) {
 	if (value = std::clamp(float(xpos - diffSliderMouseX - Pos().x) / float(Size().x - sliderW), 0.f, 1.f); callb)
-		(World::Prog()->*callb)(value);
+		(win->Input()->Prog()->*callb)(value);
 }
 
 SDL_Rect HorSlider::Slider() const {
@@ -288,10 +289,8 @@ int HorSlider::SliderX() const {
 
 // SCROLL AREA
 
-ScrollArea::ScrollArea(SDL_Point ANC, SDL_Point POS, SDL_Point SIZ, EFix FIX, SDL_Color CLR) :
-	Object(ANC, POS, SIZ, FIX, CLR),
-	diffSliderMouseY(0),
-	listY(0)
+ScrollArea::ScrollArea(WindowSys* WIN, SDL_Point ANC, SDL_Point POS, SDL_Point SIZ, EFix FIX, SDL_Color CLR) :
+	Object(WIN, ANC, POS, SIZ, FIX, CLR)
 {}
 
 ScrollArea::~ScrollArea() {
@@ -303,11 +302,11 @@ void ScrollArea::Draw() {
 	if (SDL_Rect bg = Rect(); !items.empty() && bg.h > 0) {
 		SDL_Point ipos = {bg.x + offset, bg.y - listY};
 		pair<size_t, size_t> vis(listY / (itemH + spacing), listH > bg.h ? (listY + bg.h) / (itemH + spacing) : items.size() - 1);
-		for (size_t i = vis.first; i <= vis.second; i++, ipos.y += itemH + spacing)
-			World::Window()->DrawText(texs[i], ipos, bg);
+		for (size_t i = vis.first; i <= vis.second; ++i, ipos.y += itemH + spacing)
+			win->DrawText(texs[i], ipos, bg);
 	}
-	World::Window()->DrawRect(Bar(), Object::colorDark);
-	World::Window()->DrawRect(Slider(), Object::colorLight);
+	win->DrawRect(Bar(), Object::colorDark);
+	win->DrawRect(Slider(), Object::colorLight);
 }
 
 void ScrollArea::OnResize() {
@@ -341,8 +340,8 @@ void ScrollArea::UpdateTextures() {
 		SDL_DestroyTexture(it);
 
 	texs.resize(items.size());
-	for (size_t i = 0; i < items.size(); i++)
-		texs[i] = World::Window()->RenderText(items[i], itemH);
+	for (size_t i = 0; i < items.size(); ++i)
+		texs[i] = win->RenderText(items[i], itemH);
 }
 
 SDL_Rect ScrollArea::Bar() const {

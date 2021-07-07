@@ -1,10 +1,10 @@
 #pragma once
 
-#include "inputSys.h"
+#include "utils.h"
 
 class FontSet {
 public:
-	FontSet(const string& name="arial");
+	FontSet(const char* name="arial");
 	~FontSet();
 
 	void Clear();
@@ -23,6 +23,9 @@ private:
 
 class WindowSys {
 public:
+	WindowSys();
+	~WindowSys();
+
 	int Start();
 	void Close();
 	void SwitchMenu(vector<Object*>&& objs);
@@ -35,6 +38,8 @@ public:
 	void DrawText(SDL_Texture* tex, SDL_Point pos, const SDL_Rect& frame);
 
 private:
+	static constexpr uint32_t eventTimeout = 50;
+
 	InputSys* inputSys;
 	FontSet* fonts;
 	SDL_Window* window;

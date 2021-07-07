@@ -1,4 +1,6 @@
 #include "inputSys.h"
+#include "objects.h"
+#include "program.h"
 
 // CONTROLLER
 
@@ -24,15 +26,12 @@ void InputSys::Controller::Close() {
 
 // INPUT SYS
 
-InputSys::InputSys() :
-	program(new Program),
-	mouseOver(nullptr),
-	scrollHold(nullptr),
-	curRumbling(0.f)
+InputSys::InputSys(WindowSys* window) :
+	program(new Program(window))
 {
 	SetCapture(nullptr);
 
-	for (int i = 0; i < SDL_NumJoysticks(); i++)
+	for (int i = 0; i < SDL_NumJoysticks(); ++i)
 		if (Controller dev; dev.Open(i))
 			controllers.emplace(SDL_JoystickInstanceID(dev.joystick), dev);
 	curDevice = !controllers.empty() ? controllers.begin()->first : -1;
@@ -135,10 +134,15 @@ void InputSys::TextEvent(const SDL_TextInputEvent& text) {
 	captured->OnText(text.text);
 }
 
-void InputSys::Tick(float dSec) {
-	if (curRumbling > 0.f)
-		if (curRumbling -= dSec; curRumbling <= 0.f)
+void InputSys::Tick(uint32_t dMsec) {
+	if (curRumbling) {
+		if (uint32_t val = curRumbling - dMsec; val && val <= curRumbling)
+			curRumbling = val;
+		else {
+			curRumbling = 0;
 			program->EventTestStopped();
+		}
+	}
 }
 
 void InputSys::NextController() {
@@ -154,88 +158,88 @@ void InputSys::PrevController() {
 void InputSys::FindController(size_t i) {
 	if (i < controllers.size()) {
 		umap<SDL_JoystickID, Controller>::iterator it = controllers.begin();
-		for (; i--; it++);
+		for (; i--; ++it);
 		curDevice = it->first;
 	}
 }
 
-bool InputSys::StartRumble(float strength, uint32 length) {
+bool InputSys::StartRumble(float strength, uint32_t length) {
 	if (SDL_HapticRumblePlay(controllers[curDevice].haptic, strength, length) != -1) {
-		curRumbling = float(length) / 1000.f;
+		curRumbling = length;
 		return true;
 	}
 	return false;
 }
 
 void InputSys::StopRumble() {
-	curRumbling = 0.f;
-	SDL_HapticRumbleStop(controllers[curDevice].haptic);
+	curRumbling = 0;
+	SDL_HapticRumbleStop(controllers.at(curDevice).haptic);
 	program->EventTestStopped();
 }
 
-vector<uint8> InputSys::GetJoystickButtons() {
-	vector<uint8> buttons;
-	for (int i = 0; i < SDL_JoystickNumButtons(controllers[curDevice].joystick); i++)
-		if (SDL_JoystickGetButton(controllers[curDevice].joystick, i))
+vector<uint8_t> InputSys::GetJoystickButtons() const {
+	vector<uint8_t> buttons;
+	for (int i = 0; i < SDL_JoystickNumButtons(controllers.at(curDevice).joystick); ++i)
+		if (SDL_JoystickGetButton(controllers.at(curDevice).joystick, i))
 			buttons.push_back(i);
 	return buttons;
 }
 
-vector<pair<uint8, uint8>> InputSys::GetJoystickHats() {
-	vector<pair<uint8, uint8>> hats(SDL_JoystickNumHats(controllers[curDevice].joystick));
-	for (int i = 0; i < int(hats.size()); i++)
-		hats[i] = pair(i, SDL_JoystickGetHat(controllers[curDevice].joystick, i));
+vector<pair<uint8_t, uint8_t>> InputSys::GetJoystickHats() const {
+	vector<pair<uint8_t, uint8_t>> hats(SDL_JoystickNumHats(controllers.at(curDevice).joystick));
+	for (int i = 0; i < int(hats.size()); ++i)
+		hats[i] = pair(i, SDL_JoystickGetHat(controllers.at(curDevice).joystick, i));
 	return hats;
 }
 
-vector<pair<uint8, int16>> InputSys::GetJoystickAxes() {
-	vector<pair<uint8, int16>> axes(SDL_JoystickNumAxes(controllers[curDevice].joystick));
-	for (int i = 0; i < int(axes.size()); i++)
-		axes[i] = pair(i, SDL_JoystickGetAxis(controllers[curDevice].joystick, i));
+vector<pair<uint8_t, int16_t>> InputSys::GetJoystickAxes() const {
+	vector<pair<uint8_t, int16_t>> axes(SDL_JoystickNumAxes(controllers.at(curDevice).joystick));
+	for (int i = 0; i < int(axes.size()); ++i)
+		axes[i] = pair(i, SDL_JoystickGetAxis(controllers.at(curDevice).joystick, i));
 	return axes;
 }
 
-vector<SDL_GameControllerButton> InputSys::GetGamepadButtons() {
+vector<SDL_GameControllerButton> InputSys::GetGamepadButtons() const {
 	vector<SDL_GameControllerButton> buttons;
-	for (uint8 i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++)
-		if (SDL_GameControllerGetButton(controllers[curDevice].gamepad, SDL_GameControllerButton(i)))
+	for (uint8_t i = 0; i < SDL_CONTROLLER_BUTTON_MAX; ++i)
+		if (SDL_GameControllerGetButton(controllers.at(curDevice).gamepad, SDL_GameControllerButton(i)))
 			buttons.push_back(SDL_GameControllerButton(i));
 	return buttons;
 }
 
-vector<pair<SDL_GameControllerAxis, int16>> InputSys::GetGamepadAxes() {
-	vector<pair<SDL_GameControllerAxis, int16>> axes(SDL_CONTROLLER_AXIS_MAX);
-	for (uint8 i = 0; i < SDL_CONTROLLER_AXIS_MAX; i++)
-		axes[i] = pair(SDL_GameControllerAxis(i), SDL_GameControllerGetAxis(controllers[curDevice].gamepad, SDL_GameControllerAxis(i)));
+vector<pair<SDL_GameControllerAxis, int16_t>> InputSys::GetGamepadAxes() const {
+	vector<pair<SDL_GameControllerAxis, int16_t>> axes(SDL_CONTROLLER_AXIS_MAX);
+	for (uint8_t i = 0; i < SDL_CONTROLLER_AXIS_MAX; ++i)
+		axes[i] = pair(SDL_GameControllerAxis(i), SDL_GameControllerGetAxis(controllers.at(curDevice).gamepad, SDL_GameControllerAxis(i)));
 	return axes;
 }
 
-string InputSys::JoystickName() {
-	return SDL_JoystickName(controllers[curDevice].joystick);
+const char* InputSys::JoystickName() const {
+	return SDL_JoystickName(controllers.at(curDevice).joystick);
 }
 
-string InputSys::GamepadName() {
-	return SDL_GameControllerName(controllers[curDevice].gamepad);
+const char* InputSys::GamepadName() const {
+	return SDL_GameControllerName(controllers.at(curDevice).gamepad);
 }
 
-int InputSys::NumJButtons() {
-	return SDL_JoystickNumButtons(controllers[curDevice].joystick);
+int InputSys::NumJButtons() const {
+	return SDL_JoystickNumButtons(controllers.at(curDevice).joystick);
 }
 
-int InputSys::NumJHats() {
-	return SDL_JoystickNumHats(controllers[curDevice].joystick);
+int InputSys::NumJHats() const {
+	return SDL_JoystickNumHats(controllers.at(curDevice).joystick);
 }
 
-int InputSys::NumJAxes() {
-	return SDL_JoystickNumAxes(controllers[curDevice].joystick);
+int InputSys::NumJAxes() const {
+	return SDL_JoystickNumAxes(controllers.at(curDevice).joystick);
 }
 
-bool InputSys::IsGamepad() {
-	return controllers[curDevice].gamepad;
+bool InputSys::IsGamepad() const {
+	return controllers.at(curDevice).gamepad;
 }
 
-bool InputSys::IsHaptic() {
-	return controllers[curDevice].haptic;
+bool InputSys::IsHaptic() const {
+	return controllers.at(curDevice).haptic;
 }
 
 SDL_JoystickID InputSys::CurDevice() const {
@@ -244,7 +248,7 @@ SDL_JoystickID InputSys::CurDevice() const {
 
 size_t InputSys::CurIndex() const {
 	size_t cnt = 0;
-	for (umap<SDL_JoystickID, Controller>::const_iterator it = controllers.begin(); it != controllers.end() && it->first != curDevice; it++, cnt++);
+	for (umap<SDL_JoystickID, Controller>::const_iterator it = controllers.begin(); it != controllers.end() && it->first != curDevice; ++it, ++cnt);
 	return cnt;
 }
 
@@ -283,13 +287,13 @@ LineEditor* InputSys::Captured() {
 }
 
 void InputSys::SetCapture(LineEditor* cbox) {
-	if (captured = cbox)
+	if (captured = cbox; captured)
 		SDL_StartTextInput();
 	else
 		SDL_StopTextInput();
 }
 
-bool InputSys::IsSelected(Object* obj) {
+bool InputSys::IsSelected(const Object* obj) const {
 	return obj == mouseOver;
 }
 

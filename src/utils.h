@@ -1,5 +1,6 @@
 #pragma once
 
+#define SDL_MAIN_HANDLED
 #ifdef _WIN32
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -12,25 +13,19 @@
 #include <unordered_map>
 #include <vector>
 
-#ifdef main
-#undef main
-#endif
-
-using int8 = int8_t;
-using uint8 = uint8_t;
-using int16 = int16_t;
-using uint16 = uint16_t;
-using int32 = int32_t;
-using uint32 = uint32_t;
-using int64 = int64_t;
-using uint64 = uint64_t;
-
-using std::vector;
 using std::pair;
 using std::string;
+using std::vector;
 template <class... T> using umap = std::unordered_map<T...>;
 
+class Button;
+class HorSlider;
+class InputSys;
+class LineEditor;
+class Object;
 class Program;
+class ScrollArea;
+class WindowSys;
 
 template <class T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
 constexpr T operator~(T a) {
@@ -67,11 +62,11 @@ constexpr T operator^=(T& a, T b) {
 	return a = T(std::underlying_type_t<T>(a) ^ std::underlying_type_t<T>(b));
 }
 
-constexpr inline SDL_Point operator+(SDL_Point a, SDL_Point b) {
+constexpr SDL_Point operator+(SDL_Point a, SDL_Point b) {
 	return {a.x + b.x, a.y + b.y};
 }
 
-constexpr inline SDL_Point operator-(SDL_Point a, SDL_Point b) {
+constexpr SDL_Point operator-(SDL_Point a, SDL_Point b) {
 	return {a.x - b.x, a.y - b.y};
 }
 

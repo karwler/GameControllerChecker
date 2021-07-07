@@ -2,7 +2,7 @@
 
 #include "utils.h"
 
-enum EFix : uint8 {		// fix basically means "store value in pixels instead of a 'percentage'" (which would be a value between 0 and 1)
+enum EFix : uint8_t {		// fix basically means "store value in pixels instead of a 'percentage'" (which would be a value between 0 and 1)
 	FIX_NONE = 0x0,
 	FIX_X    = 0x1,
 	FIX_Y    = 0x2,
@@ -21,7 +21,8 @@ enum EFix : uint8 {		// fix basically means "store value in pixels instead of a 
 
 class Object {
 public:
-	Object(SDL_Point ANC={}, SDL_Point POS={-1, -1}, SDL_Point SIZ={}, EFix FIX=FIX_NONE, SDL_Color CLR=colorRectangle);
+	Object(Object&&) = default;
+	Object(WindowSys* WIN = nullptr, SDL_Point ANC={}, SDL_Point POS={-1, -1}, SDL_Point SIZ={}, EFix FIX=FIX_NONE, SDL_Color CLR=colorRectangle);
 	virtual ~Object() = default;
 
 	virtual void Draw();
@@ -48,6 +49,7 @@ protected:
 	float posX, posY;
 	float endX, endY;
 	EFix fix;
+	WindowSys* win;
 
 	static SDL_Color GetColor(SDL_Color clr, bool light);
 
@@ -58,17 +60,17 @@ private:
 
 class Label : public Object {
 public:
-	enum class Align : uint8 {
+	enum class Align : uint8_t {
 		left,
 		center,
 		right
 	};
 
-	Label(const Object& BASE=Object(), string&& TXT="", Align ALG=Align::left);
-	virtual ~Label() override;
+	Label(Object&& BASE=Object(), string&& TXT="", Align ALG=Align::left);
+	~Label() override;
 
-	virtual void Draw() override;
-	virtual void OnResize() override;
+	void Draw() override;
+	void OnResize() override;
 	const string& Text() const;
 	void Text(string&& newText);
 	SDL_Texture* Texture() const;
@@ -81,10 +83,10 @@ protected:
 
 class Button : public Label {
 public:
-	Button(const Object& BASE=Object(), void (Program::*CALLB)()=nullptr, string&& TXT="", Align ALG=Align::left);
-	virtual ~Button() override = default;
+	Button(Object&& BASE=Object(), void (Program::*CALLB)()=nullptr, string&& TXT="", Align ALG=Align::left);
+	~Button() override = default;
 
-	void OnClick();
+	virtual void OnClick();
 
 protected:
 	void (Program::*callback)();
@@ -92,16 +94,16 @@ protected:
 
 class LineEditor : public Button {
 public:
-	enum class Type : uint8 {
+	enum class Type : uint8_t {
 		text,
 		integer
 	};
 
-	LineEditor(const Object& BASE=Object(), string&& TXT="", Type TYPE=Type::text, void (Program::*KCALL)(const string&)=nullptr, void (Program::*CCALL)()=nullptr);
-	virtual ~LineEditor() override = default;
+	LineEditor(Object&& BASE=Object(), string&& TXT="", Type TYPE=Type::text, void (Program::*KCALL)(const string&)=nullptr, void (Program::*CCALL)()=nullptr);
+	~LineEditor() final = default;
 
-	virtual void Draw() override;
-	void OnClick();
+	void Draw() final;
+	void OnClick() final;
 	void OnKeypress(SDL_Scancode key);
 	void OnText(const char* str);
 
@@ -111,7 +113,7 @@ public:
 private:
 	void (Program::*okCall)(const string&);
 	size_t cpos;
-	int textPos;
+	int textPos = 0;
 	Type type;
 
 	SDL_Rect Caret() const;	// position relative to Widget
@@ -124,17 +126,17 @@ private:
 
 class HorSlider : public Object {
 public:
-	HorSlider(const Object& BASE=Object(), float VAL=0.f, void (Program::*CAL)(float)=nullptr);
-	virtual ~HorSlider() override = default;
+	HorSlider(Object&& BASE=Object(), float VAL=0.f, void (Program::*CAL)(float)=nullptr);
+	~HorSlider() final = default;
 
-	virtual void Draw() override;
+	void Draw() final;
 	void DragSlider(int xpos);
 	SDL_Rect Slider() const;
 	int SliderX() const;
 
 	static constexpr int sliderW = 20;
 
-	int diffSliderMouseX;
+	int diffSliderMouseX = 0;
 private:
 	float value;
 	void (Program::*callb)(float);
@@ -142,11 +144,11 @@ private:
 
 class ScrollArea : public Object {
 public:
-	ScrollArea(SDL_Point ANC={}, SDL_Point POS={-1, -1}, SDL_Point SIZ={}, EFix FIX=FIX_NONE, SDL_Color CLR=colorBackground);
-	virtual ~ScrollArea() override;
+	ScrollArea(WindowSys* WIN = nullptr, SDL_Point ANC={}, SDL_Point POS={-1, -1}, SDL_Point SIZ={}, EFix FIX=FIX_NONE, SDL_Color CLR=colorBackground);
+	~ScrollArea() final;
 
-	virtual void Draw() override;
-	virtual void OnResize() override;
+	void Draw() final;
+	void OnResize() final;
 	void DragSlider(int ypos);
 	void DragList(int ypos);
 	void ScrollList(int ymov);
@@ -161,9 +163,9 @@ public:
 	static constexpr int itemH = 30;
 	static constexpr int spacing = 5;
 
-	int diffSliderMouseY;
+	int diffSliderMouseY = 0;
 protected:
-	int listY;
+	int listY = 0;
 	int sliderH;
 	int listH, listL;
 	vector<string> items;

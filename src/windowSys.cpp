@@ -1,37 +1,35 @@
 #include "windowSys.h"
+#include "inputSys.h"
+#include "objects.h"
+#include "program.h"
 #include <filesystem>
 namespace fs = std::filesystem;
 
 // FONT
 
-FontSet::FontSet(const string& name) {
-	TTF_Font* tmp = TTF_OpenFont(name.c_str(), fontTestHeight);
-	if (tmp)
-		file = name;
+FontSet::FontSet(const char* name) {
+	TTF_Font* tmp = nullptr;
 #ifdef _WIN32
-	else for (const fs::path& drc : {fs::path(L"."), fs::path(_wgetenv(L"SystemDrive")) / L"Windows\\Fonts"}) {
+	for (const fs::path& drc : {fs::path(L"."), fs::path(_wgetenv(L"SystemDrive")) / L"\\Windows\\Fonts"}) {
 #else
-	else for (const fs::path& drc : {fs::u8path("."), fs::u8path(getenv("HOME")) / ".fonts", fs::u8path("/usr/share/fonts")}) {
+	for (const fs::path& drc : {fs::u8path("."), fs::u8path(getenv("HOME")) / ".fonts", fs::u8path("/usr/share/fonts")}) {
 #endif
 		try {
 			for (const fs::directory_entry& it : fs::recursive_directory_iterator(drc, fs::directory_options::follow_directory_symlink | fs::directory_options::skip_permission_denied))
-#ifdef _WIN32
-				if (!_stricmp(it.path().stem().u8string().c_str(), name.c_str()))
-#else
-				if (!strcasecmp(it.path().stem().u8string().c_str(), name.c_str()))
-#endif
-					if (string path = it.path().u8string(); tmp = TTF_OpenFont(path.c_str(), fontTestHeight)) {
+				if (!SDL_strcasecmp(it.path().stem().u8string().c_str(), name)) {
+					string path = it.path().u8string();
+					if (tmp = TTF_OpenFont(path.c_str(), fontTestHeight); tmp) {
 						file = path;
 						break;
 					}
+				}
 		} catch (...) {}
 	}
 	if (!tmp)
-		throw std::runtime_error("couldn't find font");
+		throw std::runtime_error("Couldn't find font");
 
 	int size;
-	TTF_SizeUTF8(tmp, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~!@#$%^&*()_+-=[]{}'\\\"|;:,.<>/?", nullptr, &size);
-	heightScale = float(fontTestHeight) / float(size);
+	heightScale = !TTF_SizeUTF8(tmp, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`~!@#$%^&*()_+-=[]{}'\\\"|;:,.<>/?", nullptr, &size) ? float(fontTestHeight) / float(size) : 1.f;
 	TTF_CloseFont(tmp);
 }
 
@@ -40,8 +38,8 @@ FontSet::~FontSet() {
 }
 
 void FontSet::Clear() {
-	for (const pair<const int, TTF_Font*>& it : fonts)
-		TTF_CloseFont(it.second);
+	for (auto [size, font] : fonts)
+		TTF_CloseFont(font);
 	fonts.clear();
 }
 
@@ -66,6 +64,10 @@ SDL_Point FontSet::TextSize(const string& text, int size) {
 
 // WINDOW SYS
 
+WindowSys::WindowSys() = default;	// needs to be here to make unique pointers happy
+
+WindowSys::~WindowSys() = default;	// ^
+
 int WindowSys::Start() {
 	inputSys = nullptr;
 	fonts = nullptr;
@@ -86,10 +88,10 @@ int WindowSys::Start() {
 		delete it;
 	delete inputSys;
 	delete fonts;
-	if (renderer)
-		SDL_DestroyRenderer(renderer);
-	if (window)
-		SDL_DestroyWindow(window);
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+	renderer = nullptr;
+	window = nullptr;
 	TTF_Quit();
 	SDL_Quit();
 	return retval;
@@ -100,44 +102,75 @@ void WindowSys::Run() {
 		throw std::runtime_error(SDL_GetError());
 	if (TTF_Init())
 		throw std::runtime_error(TTF_GetError());
-	if (!(window = SDL_CreateWindow("Controller Test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, SDL_WINDOW_RESIZABLE)))
+
+	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+	SDL_EventState(SDL_FINGERMOTION, SDL_DISABLE);
+	SDL_EventState(SDL_TEXTEDITING, SDL_DISABLE);
+	SDL_EventState(SDL_KEYMAPCHANGED, SDL_DISABLE);
+	SDL_EventState(SDL_JOYBALLMOTION, SDL_DISABLE);
+	SDL_EventState(SDL_CONTROLLERDEVICEADDED, SDL_DISABLE);
+	SDL_EventState(SDL_CONTROLLERDEVICEREMOVED, SDL_DISABLE);
+	SDL_EventState(SDL_CONTROLLERDEVICEREMAPPED, SDL_DISABLE);
+	SDL_EventState(SDL_DOLLARGESTURE, SDL_DISABLE);
+	SDL_EventState(SDL_DOLLARRECORD, SDL_DISABLE);
+	SDL_EventState(SDL_MULTIGESTURE, SDL_DISABLE);
+	SDL_EventState(SDL_CLIPBOARDUPDATE, SDL_DISABLE);
+	SDL_EventState(SDL_DROPFILE, SDL_DISABLE);
+	SDL_EventState(SDL_DROPTEXT, SDL_DISABLE);
+	SDL_EventState(SDL_DROPBEGIN, SDL_DISABLE);
+	SDL_EventState(SDL_DROPCOMPLETE, SDL_DISABLE);
+	SDL_EventState(SDL_AUDIODEVICEADDED, SDL_DISABLE);
+	SDL_EventState(SDL_AUDIODEVICEREMOVED, SDL_DISABLE);
+	SDL_EventState(SDL_RENDER_TARGETS_RESET, SDL_DISABLE);
+	SDL_EventState(SDL_RENDER_DEVICE_RESET, SDL_DISABLE);
+
+	if (window = SDL_CreateWindow("Controller Test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, SDL_WINDOW_RESIZABLE); !window)
 		throw std::runtime_error(SDL_GetError());
-	if (!(renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)))
+	if (renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC); !renderer)
 		throw std::runtime_error(SDL_GetError());
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 	SDL_SetWindowMinimumSize(window, 200, 200);
 
 	fonts = new FontSet;
-	inputSys = new InputSys;
+	inputSys = new InputSys(this);
 	run = true;
 	inputSys->Prog()->EventControllersChanged(true);
-	for (uint32 oldTime = SDL_GetTicks(); run;) {
-		// get delta seconds
-		uint32 newTime = SDL_GetTicks();
-		float dSec = float(newTime - oldTime) / 1000.f;
+	for (uint32_t oldTime = SDL_GetTicks(); run;) {
+		uint32_t newTime = SDL_GetTicks();
+		uint32_t dMsec = newTime - oldTime;
 		oldTime = newTime;
 
-		// draw scene
 		SDL_SetRenderDrawColor(renderer, Object::colorBackground.r, Object::colorBackground.g, Object::colorBackground.b, Object::colorBackground.a);
 		SDL_RenderClear(renderer);
 		for (Object* obj : objects)
 			obj->Draw();
 		SDL_RenderPresent(renderer);
 
-		// handle events
-		inputSys->Tick(dSec);
-		uint32 timeout = SDL_GetTicks() + 50;
+		inputSys->Tick(dMsec);
+		SDL_Event event;
+		uint32_t timeout = SDL_GetTicks() + eventTimeout;
 		do {
-			SDL_Event event;
 			if (!SDL_PollEvent(&event))
 				break;
 			HandleEvent(event);
-		} while (SDL_GetTicks() < timeout);
+		} while (!SDL_TICKS_PASSED(SDL_GetTicks(), timeout));
 	}
 }
 
 void WindowSys::HandleEvent(const SDL_Event& event) {
 	switch (event.type) {
+	case SDL_QUIT:
+		Close();
+		break;
+	case SDL_WINDOWEVENT:
+		WindowEvent(event.window);
+		break;
+	case SDL_KEYDOWN:
+		inputSys->KeypressEvent(event.key);
+		break;
+	case SDL_TEXTINPUT:
+		inputSys->TextEvent(event.text);
+		break;
 	case SDL_MOUSEMOTION:
 		inputSys->MouseMotionEvent(event.motion, objects);
 		break;
@@ -150,38 +183,26 @@ void WindowSys::HandleEvent(const SDL_Event& event) {
 	case SDL_MOUSEWHEEL:
 		inputSys->MouseWheelEvent(event.wheel);
 		break;
-	case SDL_KEYDOWN:
-		inputSys->KeypressEvent(event.key);
-		break;
-	case SDL_TEXTINPUT:
-		inputSys->TextEvent(event.text);
-		break;
-	case SDL_JOYBUTTONDOWN: case SDL_JOYBUTTONUP:
-		inputSys->Prog()->EventJoystickButton(event.jbutton.which);
+	case SDL_JOYAXISMOTION:
+		inputSys->Prog()->EventJoystickAxis(event.jaxis.which);
 		break;
 	case SDL_JOYHATMOTION:
 		inputSys->Prog()->EventJoystickHat(event.jhat.which);
 		break;
-	case SDL_JOYAXISMOTION:
-		inputSys->Prog()->EventJoystickAxis(event.jaxis.which);
-		break;
-	case SDL_CONTROLLERBUTTONDOWN: case SDL_CONTROLLERBUTTONUP:
-		inputSys->Prog()->EventGamepadButton(event.cbutton.which);
-		break;
-	case SDL_CONTROLLERAXISMOTION:
-		inputSys->Prog()->EventGamepadAxis(event.caxis.which);
+	case SDL_JOYBUTTONDOWN: case SDL_JOYBUTTONUP:
+		inputSys->Prog()->EventJoystickButton(event.jbutton.which);
 		break;
 	case SDL_JOYDEVICEADDED:
 		inputSys->AddController(event.jdevice.which);
 		break;
 	case SDL_JOYDEVICEREMOVED:
 		inputSys->DelController(event.jdevice.which);
-		break;	// TODO: what about gamectroller device events?
-	case SDL_WINDOWEVENT:
-		WindowEvent(event.window);
 		break;
-	case SDL_QUIT:
-		Close();
+	case SDL_CONTROLLERAXISMOTION:
+		inputSys->Prog()->EventGamepadAxis(event.caxis.which);
+		break;
+	case SDL_CONTROLLERBUTTONDOWN: case SDL_CONTROLLERBUTTONUP:
+		inputSys->Prog()->EventGamepadButton(event.cbutton.which);
 	}
 }
 

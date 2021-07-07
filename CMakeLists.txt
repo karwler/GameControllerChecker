@@ -11,15 +11,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(SRC_FILES
 	"src/inputSys.cpp"
 	"src/inputSys.h"
+	"src/main.cpp"
 	"src/objects.cpp"
 	"src/objects.h"
 	"src/program.cpp"
 	"src/program.h"
 	"src/utils.h"
 	"src/windowSys.cpp"
-	"src/windowSys.h"
-	"src/world.cpp"
-	"src/world.h")
+	"src/windowSys.h")
 
 # dependencies
 set(VER_SDL "2.0.12" CACHE STRING "SDL2 version.")
@@ -99,16 +98,16 @@ if(NOT EMSCRIPTEN)
 endif()
 
 # flags
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	add_definitions(-D_UNICODE -D_CRT_SECURE_NO_WARNINGS)
 endif()
 
 if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
-	set(CXX_FLG_ANY "-Wall -Wextra -pedantic-errors -Wdouble-promotion -Wformat=2 -Wmissing-declarations -Wold-style-cast -Wshadow -Wunreachable-code -Wno-implicit-fallthrough -Wno-parentheses -Wno-switch")
+	set(CXX_FLG_ANY "-Wall -Wextra -pedantic-errors -Wdouble-promotion -Wformat=2 -Wmissing-declarations -Wold-style-cast -Wshadow -Wunreachable-code -Wno-implicit-fallthrough -Wno-switch")
 	if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 		set(CXX_FLG_ANY "${CXX_FLG_ANY} -Wcast-align=strict -Wduplicated-branches -Wduplicated-cond -Wlogical-op -Wuseless-cast")
 	else()
-		set(CXX_FLG_ANY "${CXX_FLG_ANY} -Wcast-align -Wnull-dereference -Wshadow-all -Wno-unused-private-field")
+		set(CXX_FLG_ANY "${CXX_FLG_ANY} -Wcast-align -Wnull-dereference -Wshadow-all -Wno-final-dtor-non-final-class -Wno-unused-private-field")
 	endif()
 
 	if(EMSCRIPTEN)
@@ -116,10 +115,13 @@ if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") OR (CMAKE_CXX_COMPILER_ID STREQUAL "Cl
 		set(FLG_DEBUG "-g4 -s DISABLE_EXCEPTION_CATCHING=0")
 		set(FLG_RELEASE "-O3")
 	else()
+		if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+			set(CXX_FLG_ANY "${CXX_FLG_ANY} -mmmx -msse -msse2")
+		endif()
 		set(FLG_DEBUG "-g")
 		set(FLG_RELEASE "-O3")
 		if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-			set(FLG_RELEASE "${FLG_RELEASE} -s")
+			set(FLG_RELEASE "${FLG_RELEASE} -flto -fuse-linker-plugin -s")
 		endif()
 	endif()
 elseif(MSVC)
@@ -151,7 +153,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 									RUNTIME_OUTPUT_DIRECTORY_RELEASE "${EXECUTABLE_OUTPUT_PATH}")
 
 # post buils commands
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
 	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 						COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${BIN_SDL}/SDL2.dll" "${BIN_TTF}/SDL2_ttf.dll" "${BIN_TTF}/libfreetype-6.dll" "${BIN_TTF}/zlib1.dll" "${EXECUTABLE_OUTPUT_PATH}"
 						COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${DIR_SDL}/COPYING.txt" "${EXECUTABLE_OUTPUT_PATH}/COPYING.SDL.txt"

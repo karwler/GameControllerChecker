@@ -1,9 +1,11 @@
 #pragma once
 
-#include "objects.h"
+#include "utils.h"
 
 class Program {
 public:
+	Program(WindowSys* window);
+
 	void EventOpenJoystickView();
 	void EventOpenNextJoystick();
 	void EventOpenPrevJoystick();
@@ -27,16 +29,19 @@ public:
 	void EventLengthChanged(const string& text);
 
 private:
-	enum class Menu : uint8 {
+	enum class Menu : uint8_t {
 		none,
 		joystick,
 		gamepad,
 		haptic
 	} curMenu;
-	ScrollArea *buttonList, *hatList, *axisList;
+	WindowSys* win;
+	ScrollArea* buttonList;
+	ScrollArea* hatList;
+	ScrollArea* axisList;
 
 	float curHRStrength;
-	uint32 curHRLength;
+	uint32_t curHRLength;
 	Button* hTestButton;
 
 	void SwitchScene(Menu newMenu);
